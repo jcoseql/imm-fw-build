@@ -44,7 +44,8 @@ off, used, bs = cands[-1]
 open('/tmp/root.sqfs','wb').write(d[off:off+used])
 print("squashfs: offset=%s used=%d (%.1f MiB)" % (off, used, used/1048576))
 PY
-rm -rf /tmp/ex && unsquashfs -q -d /tmp/ex /tmp/root.sqfs
+sudo rm -rf /tmp/ex
+sudo unsquashfs -no-progress -q -d /tmp/ex /tmp/root.sqfs
 
 check_sha() { # $1=期望sha  $2=路径
   echo "$1  $2" | sha256sum -c - || { echo "❌ sha 不符: $2"; exit 1; }
