@@ -6,7 +6,8 @@
 # ============================================================
 set -euo pipefail
 cd bin/targets/rockchip/armv8
-IMG=$(ls *.img.gz | head -1)
+IMG=$(ls *squashfs-sysupgrade.img.gz | head -1)
+[ -n "$IMG" ] || { echo "❌ 未找到 squashfs-sysupgrade 镜像"; ls -la; exit 1; }
 MAN=$(ls *.manifest | head -1)
 echo "IMG = $IMG"
 echo "MAN = $MAN"
