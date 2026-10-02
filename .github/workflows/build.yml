@@ -3,10 +3,12 @@ name: Build 25.12.x Rockchip (自建 IB · dae 固化版)
 # ============================================================
 # 自建 ImageBuilder 固化构建 —— 不依赖任何第三方构建脚本
 #   官方组件: immortalwrt/imagebuilder:rockchip-armv8-openwrt-<ver> + 官方 feed
-#   烘入: dae r857.17cc1d (本仓库 Releases, sha256 锁定) + geo + procd init
+#   烘入: dae main@e3fee8fb (本仓库 Releases, sha256 锁定) + geo + procd init
 #         + Tailscale 官方静态 v1.102.4 (pkgs.tailscale.com, sha256 锁定)
+#   固定: XDP 全量工具面 (ip-full/bpftool/xdp-tools) + /root/xdp 试装件 (CI 现编 .o)
+#   可选: enable_docker=yes → docker/dockerd/compose + kmod-br-netfilter (依赖自动解析)
 #   首启: files/etc/uci-defaults/99-custom.sh —— 仅设管理 IP, 不放开 WAN 入站
-#   自检: manifest 断言 (无 argon) + 解包比对烘入件 sha256 (scripts/selfcheck.sh)
+#   自检: manifest 断言 + 解包比对烘入件 sha256 + XDP 试装件 (scripts/selfcheck.sh)
 #   仅手动触发 (workflow_dispatch)
 # ============================================================
 
@@ -128,12 +130,12 @@ jobs:
       - name: Stage files/ (管理IP + dae + geo + Tailscale)
         run: |
           set -euo pipefail
-          mkdir -p files/etc/config files/usr/bin files/usr/sbin files/usr/local/share/dae files/etc/init.d files/etc/uci-defaults
+          mkdir -p files/etc/config files/usr/bin files/usr/sbin files/usr/local/share/dae files/etc/init.d files/etc/uci-defaults files/root/xdp
           # 管理 IP (供首启脚本读取)
           echo "${{ inputs.custom_router_ip }}" > files/etc/config/custom_router_ip.txt
-          # dae r857.17cc1d (本仓库 Releases 托管; 换版: 改 URL + sha 两行)
-          curl -fsSL -o /tmp/dae https://github.com/jcoseql/imm-fw-build/releases/download/dae-bin-r857/dae-linux-arm64-r857.17cc1d
-          echo "930142c5f98820e97d9b829952c44336b9e33b85c9f94fcd65f19d04267ce073  /tmp/dae" | sha256sum -c
+          # dae main@e3fee8fb (2026-10-02 Daily Build; 本仓库 Releases 托管; 换版: 改 URL + sha 两行)
+          curl -fsSL -o /tmp/dae https://github.com/jcoseql/imm-fw-build/releases/download/dae-bin-e3fee8fb/dae-linux-arm64-e3fee8fb
+          echo "cc6c18d47bb9c404fab864cadb983e188766a5187ec706ab6a7fb88257f14d59  /tmp/dae" | sha256sum -c
           install -m 0755 /tmp/dae files/usr/bin/dae
           # geo 数据 (Loyalsoldier latest)
           curl -fsSL -o files/usr/local/share/dae/geoip.dat  https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
@@ -150,6 +152,17 @@ jobs:
           chmod 0755 files/etc/init.d/dae files/etc/uci-defaults/99-custom.sh
           echo "== files/ 清单 =="
           find files -type f | sort
+
+      - name: Compile XDP 试装件 (clang -target bpf)
+        run: |
+          set -euo pipefail
+          if ! command -v clang >/dev/null 2>&1; then
+            sudo apt-get -qq update && sudo apt-get -qq install -y clang
+          fi
+          clang --version | head -1
+          clang -O2 -target bpf -c files/root/xdp/xdp_pass.c -o files/root/xdp/xdp_pass.o
+          ls -la files/root/xdp/
+          od -An -tx1 -N4 files/root/xdp/xdp_pass.o
 
       - name: Build (官方 ImageBuilder 容器)
         run: |
@@ -171,7 +184,9 @@ jobs:
           echo "== 产物 =="
           ls -la bin/targets/rockchip/armv8/
 
-      - name: Self-check (manifest + 解包比对)
+      - name: Self-check (manifest + 解包比对 + XDP)
+        env:
+          ENABLE_DOCKER: ${{ inputs.enable_docker }}
         run: bash scripts/selfcheck.sh
 
       - name: Create info
@@ -183,7 +198,9 @@ jobs:
           - 🏠 **管理地址**: ${{ inputs.custom_router_ip }}
           - 👤 **用户名**: root
           - 🔑 **密码**: 无 (刷机后请尽快设置)
-          - 🧬 **dae**: r857.17cc1d 已烘入 (/usr/bin/dae + /etc/init.d/dae + geo; 刷后放 /etc/dae/config.dae (0640) 再 start)
+          - 🧬 **dae**: main@e3fee8fb (10/02 Daily) 已烘入 (/usr/bin/dae + /etc/init.d/dae + geo; 刷后放 /etc/dae/config.dae (0640) 再 start)
+          - 🧪 **XDP**: 全量工具面 + /root/xdp/ 试装件 (RTL8125BG 仅 generic 模式)
+          - 🐳 **Docker**: ${{ inputs.enable_docker }}
           - 🧦 **Tailscale**: 官方静态 v1.102.4 (/usr/sbin)
           - 🎨 **主题**: bootstrap (无 argon)
           - 🛡️ **首启**: 仅设管理 IP; WAN 入站默认拒绝
