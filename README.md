@@ -34,7 +34,7 @@
 - dae：放 `/etc/dae/config.dae`（0640）→ `/etc/init.d/dae start`（S99dae 已就位）
 - Tailscale：恢复 `/etc/tailscale/` state → `/etc/init.d/tailscale start`
 - Docker：`/etc/init.d/dockerd enable` 开自启（镜像不自动 enable）；data-root 默认 `/opt/docker`，建议先挂盘再改 `/etc/config/dockerd`
-- XDP：`/root/xdp/README-xdp.txt` 有用法说明（E52C 为 RTL8125BG，仅 generic/skb 模式）
+- XDP：`/root/xdp/README-xdp.txt` 有用法说明（native/skb 两种挂法；SoC GMAC 口可 native，Realtek 口仅 skb）
 - root 无密码：尽快设置；WAN 入站默认拒绝（首启脚本不做任何放开）
 
 ## 版本升级

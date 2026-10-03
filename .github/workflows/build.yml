@@ -199,7 +199,7 @@ jobs:
           - 👤 **用户名**: root
           - 🔑 **密码**: 无 (刷机后请尽快设置)
           - 🧬 **dae**: main@e3fee8fb (10/02 Daily) 已烘入 (/usr/bin/dae + /etc/init.d/dae + geo; 刷后放 /etc/dae/config.dae (0640) 再 start)
-          - 🧪 **XDP**: 全量工具面 + /root/xdp/ 试装件 (RTL8125BG 仅 generic 模式)
+          - 🧪 **XDP**: 全量工具面 + /root/xdp/ 试装件 (native/skb 两种挂法; 用法见机内 /root/xdp/README-xdp.txt)
           - 🐳 **Docker**: ${{ inputs.enable_docker }}
           - 🧦 **Tailscale**: 官方静态 v1.102.4 (/usr/sbin)
           - 🎨 **主题**: bootstrap (无 argon)

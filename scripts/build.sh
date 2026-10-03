@@ -16,7 +16,7 @@ PACKAGES="$PACKAGES luci-app-vlmcsd luci-i18n-vlmcsd-zh-cn vlmcsd"
 PACKAGES="$PACKAGES kmod-sched-core kmod-sched-bpf kmod-veth kmod-tun kmod-xdp-sockets-diag"
 PACKAGES="$PACKAGES tailscale"
 # 注: tailscale 包提供 init/配置/uci 集成; 实际二进制由 files/usr/sbin/ 覆盖为官方静态 v1.102.4
-# XDP 全量工具面 (E52C 网口为 RTL8125BG: 仅 generic/skb 模式; 试装件见 files/root/xdp/)
+# XDP 全量工具面 (native 与 generic/skb 两种挂法均覆盖; 试装件见 files/root/xdp/)
 PACKAGES="$PACKAGES ip-full bpftool-minimal xdp-loader xdp-filter xdpdump"
 
 if [ "${ENABLE_DOCKER:-no}" = "yes" ]; then
