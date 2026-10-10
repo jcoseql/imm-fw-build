@@ -1,9 +1,9 @@
 #!/bin/bash
 # ============================================================
 # 构建后自检 (在 runner 上执行, cwd = 仓库根)
-#   1) manifest 断言: 无 argon; 关键包在列 (docker 按开关条件断言)
+#   1) manifest 断言: 无 argon; 关键包在列 (docker/XDP 按开关条件断言; 非 XDP 断言零残留)
 #   2) 解包 squashfs: 比对烘入件 sha256; 检查首启脚本 / rc.d / 无 config.dae
-#   3) XDP 试装件: /root/xdp/ (xdp_pass.c + ELF .o + README)
+#   3) XDP 门控: 白名单硬件断言试装件在位 (ELF .o); 非白名单断言零残留
 # ============================================================
 set -euo pipefail
 cd bin/targets/rockchip/armv8
@@ -12,14 +12,30 @@ IMG=$(ls *squashfs-sysupgrade.img.gz | head -1)
 MAN=$(ls *.manifest | head -1)
 echo "IMG = $IMG"
 echo "MAN = $MAN"
+echo "ENABLE_XDP = ${ENABLE_XDP:-no}"
 
 echo "== [1] manifest 断言 =="
 if grep -qi "argon" "$MAN"; then echo "❌ manifest 残留 argon:"; grep -i argon "$MAN"; exit 1; fi
 echo "✓ 无 argon"
-for p in vlmcsd luci-app-upnp miniupnpd-nftables luci-app-vlmcsd luci-i18n-ttyd-zh-cn openssh-sftp-server tailscale ip-full bpftool-minimal xdp-loader xdp-filter xdpdump; do
+for p in vlmcsd luci-app-upnp miniupnpd-nftables luci-app-vlmcsd luci-i18n-ttyd-zh-cn openssh-sftp-server tailscale; do
   grep -q "^${p} " "$MAN" || { echo "❌ 缺包: $p"; exit 1; }
 done
-echo "✓ 关键包在列 (vlmcsd / upnp / ttyd-zh / sftp-server / tailscale / XDP 工具面)"
+echo "✓ 关键包在列 (vlmcsd / upnp / ttyd-zh / sftp-server / tailscale)"
+if [ "${ENABLE_XDP:-no}" = "yes" ]; then
+  for p in ip-full bpftool-minimal xdp-loader xdp-filter xdpdump; do
+    grep -q "^${p} " "$MAN" || { echo "❌ 缺包 (native 硬件应带 XDP 工具面): $p"; exit 1; }
+  done
+  echo "✓ XDP 工具面在列 (native-capable 硬件)"
+else
+  for p in bpftool-minimal xdp-loader xdp-filter xdpdump libxdp163; do
+    if grep -q "^${p} " "$MAN"; then echo "❌ XDP 残留: $p (非 native 硬件按策略不应烘入)"; exit 1; fi
+  done
+  echo "✓ 无 XDP 工具面 (纯内核网络栈)"
+  # ip-full / libbpf1: 通用件, 不作硬断言 (若被依赖链带入不判失败, 仅提示)
+  for p in ip-full libbpf1; do
+    if grep -q "^${p} " "$MAN"; then echo "  (注: $p 在列 — 通用件, 非 XDP 硬信号, 不判失败)"; fi
+  done
+fi
 if [ "${ENABLE_DOCKER:-no}" = "yes" ]; then
   for p in dockerd docker docker-compose containerd runc iptables-nft kmod-br-netfilter; do
     grep -q "^${p} " "$MAN" || { echo "❌ 缺包 (docker): $p"; exit 1; }
@@ -74,11 +90,18 @@ echo "✓ S99dae 开机自启已就位"
 if [ -e /tmp/ex/etc/dae/config.dae ]; then echo "❌ 发现 config.dae (不应存在!)"; exit 1; fi
 echo "✓ 无 config.dae (纯二进制版)"
 
-echo "== [3] XDP 试装件 =="
-sudo test -f /tmp/ex/root/xdp/xdp_pass.c     || { echo "❌ 缺 xdp_pass.c"; exit 1; }
-sudo test -s /tmp/ex/root/xdp/xdp_pass.o     || { echo "❌ 缺 xdp_pass.o (CI clang 编译失败?)"; exit 1; }
-[ "$(sudo head -c4 /tmp/ex/root/xdp/xdp_pass.o | od -An -tx1 | tr -d ' \n')" = "7f454c46" ] || { echo "❌ xdp_pass.o 非 ELF"; exit 1; }
-sudo test -f /tmp/ex/root/xdp/README-xdp.txt || { echo "❌ 缺 README-xdp.txt"; exit 1; }
-echo "✓ XDP 试装件在位 (xdp_pass.c + ELF .o + README-xdp.txt)"
+echo "== [3] XDP 门控检查 =="
+if [ "${ENABLE_XDP:-no}" = "yes" ]; then
+  sudo test -f /tmp/ex/root/xdp/xdp_pass.c     || { echo "❌ 缺 xdp_pass.c"; exit 1; }
+  sudo test -s /tmp/ex/root/xdp/xdp_pass.o     || { echo "❌ 缺 xdp_pass.o (CI clang 编译失败?)"; exit 1; }
+  [ "$(sudo head -c4 /tmp/ex/root/xdp/xdp_pass.o | od -An -tx1 | tr -d ' \n')" = "7f454c46" ] || { echo "❌ xdp_pass.o 非 ELF"; exit 1; }
+  sudo test -f /tmp/ex/root/xdp/README-xdp.txt || { echo "❌ 缺 README-xdp.txt"; exit 1; }
+  echo "✓ XDP 试装件在位 (xdp_pass.c + ELF .o + README-xdp.txt)"
+else
+  for f in xdp_pass.c xdp_pass.o README-xdp.txt; do
+    if sudo test -e "/tmp/ex/root/xdp/$f"; then echo "❌ XDP 试装件残留: /root/xdp/$f"; exit 1; fi
+  done
+  echo "✓ 无 XDP 试装件 (纯内核网络栈, 门控生效)"
+fi
 
 echo "SELFCHECK_PASS"

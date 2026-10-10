@@ -11,10 +11,14 @@
 | geoip / geosite | Loyalsoldier latest | 构建时下载 |
 | dae procd init | `files/etc/init.d/dae` | sha256 `824fc2e3…`；IB 自动 enable（S99dae） |
 | Tailscale 官方静态 `v1.102.4` | `pkgs.tailscale.com`（GitHub Release 无二进制资产） | sha256 ×3（tgz + 两二进制）；自检解包比对 |
-| XDP 全量工具面 | 官方 feed：`ip-full` `bpftool-minimal` `xdp-loader` `xdp-filter` `xdpdump` | 自检断言在列 |
-| XDP 试装件 | `files/root/xdp/`（xdp_pass.c + README） | CI 现编 .o（clang -target bpf）；自检断言 ELF |
+| XDP 工具面（门控） | 官方 feed：`ip-full` `bpftool-minimal` `xdp-loader` `xdp-filter` `xdpdump` —— 仅 native-capable 硬件白名单烘入 | 自检条件断言；非白名单断言零残留 |
+| XDP 试装件（门控） | `xdp/`（xdp_pass.c + README；CI 条件叠加进 `files/`） | native 硬件才现编 .o（clang -target bpf）；自检断言 ELF / 断言无残留 |
 | 首启脚本 | `files/etc/uci-defaults/99-custom.sh`（自建，仅设管理 IP） | 自检断言在位 |
-| 包清单 | `scripts/build.sh`（唯一权威位置） | 自检断言关键包（docker 条件断言） |
+| 包清单 | `scripts/build.sh`（唯一权威位置） | 自检断言关键包（docker/XDP 条件断言） |
+
+### XDP 门控（2026-10-10 起）
+
+XDP 器具只烘给 **native-capable 硬件**（stmmac/dwmac-rk 系 GMAC 口；白名单在 workflow「XDP 门控」步骤，判定依据 `openwrt-firmware` 技能 references/xdp-native-fleet.md）。Realtek（r8125/r8169）与 USB 口只能 generic——此类机型（如 E52C/R2）固件为**纯内核网络栈**，自检断言无 XDP 残留。
 
 ## 运行
 
@@ -25,7 +29,7 @@
    - `custom_router_ip`：管理地址（如 `192.168.12.1`）
    - `rootfs_partsize`：2G 默认（R3S 用 4G）
    - `enable_docker`：默认 no；yes 时加 docker/dockerd/compose + kmod-br-netfilter（其余依赖自动解析）
-3. 构建结束前自带 **Self-check**（manifest 断言 + 解包 sha 比对 + XDP 试装件），失败会红
+3. 构建结束前自带 **Self-check**（manifest 断言 + 解包 sha 比对 + XDP 门控双断言），失败会红
 4. 产物在 Releases（tag `Autobuild`）：`*.img.gz` + `sha256sums` + `*.manifest`
 
 ## 刷机后
@@ -34,14 +38,14 @@
 - dae：放 `/etc/dae/config.dae`（0640）→ `/etc/init.d/dae start`（S99dae 已就位）
 - Tailscale：恢复 `/etc/tailscale/` state → `/etc/init.d/tailscale start`
 - Docker：`/etc/init.d/dockerd enable` 开自启（镜像不自动 enable）；data-root 默认 `/opt/docker`，建议先挂盘再改 `/etc/config/dockerd`
-- XDP：`/root/xdp/README-xdp.txt` 有用法说明（native/skb 两种挂法；SoC GMAC 口可 native，Realtek 口仅 skb）
+- XDP（仅 native 白名单硬件有）：`/root/xdp/README-xdp.txt` 有用法说明（native/skb 两种挂法）；非白名单硬件（如 E52C）无此器具，纯内核网络栈
 - root 无密码：尽快设置；WAN 入站默认拒绝（首启脚本不做任何放开）
 
 ## 版本升级
 
 - **dae 换版**：传新二进制到 Releases → 改 workflow 里 URL + sha（2 行）+ `selfcheck.sh` 里对应 sha（1 行）
 - **Tailscale 换版**：改 workflow 里 URL（1 处）+ sha（3 处）+ `selfcheck.sh`（2 行）
-- **增删包**：只改 `scripts/build.sh` 的 PACKAGES（XDP 工具面、docker 块都在那里）
+- **增删包**：只改 `scripts/build.sh` 的 PACKAGES（docker 块在那里；XDP 工具面在其门控分支内，白名单在 workflow）
 
 ## 本地复核（可选）
 

@@ -13,11 +13,15 @@ PACKAGES="$PACKAGES luci-i18n-ttyd-zh-cn luci-i18n-filemanager-zh-cn"
 PACKAGES="$PACKAGES luci-app-upnp luci-i18n-upnp-zh-cn miniupnpd-nftables"
 PACKAGES="$PACKAGES luci-app-vlmcsd luci-i18n-vlmcsd-zh-cn vlmcsd"
 # dae / Tailscale 运行依赖
+# 注: kmod-xdp-sockets-diag 是 dae 包声明的运行依赖 (非 XDP 试验面), 随 dae 保留
 PACKAGES="$PACKAGES kmod-sched-core kmod-sched-bpf kmod-veth kmod-tun kmod-xdp-sockets-diag"
 PACKAGES="$PACKAGES tailscale"
 # 注: tailscale 包提供 init/配置/uci 集成; 实际二进制由 files/usr/sbin/ 覆盖为官方静态 v1.102.4
-# XDP 全量工具面 (native 与 generic/skb 两种挂法均覆盖; 试装件见 files/root/xdp/)
-PACKAGES="$PACKAGES ip-full bpftool-minimal xdp-loader xdp-filter xdpdump"
+# XDP 工具面 —— 门控: 仅 native-capable 硬件 (workflow 白名单判定, ENABLE_XDP=yes) 才烘入;
+# 默认 no = 纯内核网络栈 (Realtek 口无 native XDP; 试装件在 xdp/, 由 workflow 条件叠加)
+if [ "${ENABLE_XDP:-no}" = "yes" ]; then
+  PACKAGES="$PACKAGES ip-full bpftool-minimal xdp-loader xdp-filter xdpdump"
+fi
 
 if [ "${ENABLE_DOCKER:-no}" = "yes" ]; then
   # 引擎 + CLI + compose (containerd/runc/iptables-nft/kmod 依赖自动解析)
@@ -30,6 +34,7 @@ echo "================================================"
 echo "PROFILE          = $PROFILE"
 echo "ROOTFS_PARTSIZE  = $ROOTFS_PARTSIZE"
 echo "ENABLE_DOCKER    = ${ENABLE_DOCKER:-no}"
+echo "ENABLE_XDP       = ${ENABLE_XDP:-no}"
 echo "PACKAGES         = $PACKAGES"
 echo "--- repositories (官方 feed) ---"
 cat repositories

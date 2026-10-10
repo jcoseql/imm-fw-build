@@ -5,10 +5,11 @@ name: Build 25.12.x Rockchip (自建 IB · dae 固化版)
 #   官方组件: immortalwrt/imagebuilder:rockchip-armv8-openwrt-<ver> + 官方 feed
 #   烘入: dae main@e3fee8fb (本仓库 Releases, sha256 锁定) + geo + procd init
 #         + Tailscale 官方静态 v1.102.4 (pkgs.tailscale.com, sha256 锁定)
-#   固定: XDP 全量工具面 (ip-full/bpftool/xdp-tools) + /root/xdp 试装件 (CI 现编 .o)
+#   门控: XDP 工具面 + /root/xdp 试装件 —— 仅 native-capable 硬件 (白名单) 自动烘入;
+#         其余硬件 (E52C/R2 等 Realtek 口) 保持纯内核网络栈, 自检断言无 XDP 残留
 #   可选: enable_docker=yes → docker/dockerd/compose + kmod-br-netfilter (依赖自动解析)
 #   首启: files/etc/uci-defaults/99-custom.sh —— 仅设管理 IP, 不放开 WAN 入站
-#   自检: manifest 断言 + 解包比对烘入件 sha256 + XDP 试装件 (scripts/selfcheck.sh)
+#   自检: manifest 断言 + 解包比对烘入件 sha256 + XDP 门控双断言 (scripts/selfcheck.sh)
 #   仅手动触发 (workflow_dispatch)
 # ============================================================
 
@@ -127,10 +128,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: XDP 门控 (仅 native-capable 硬件白名单)
+        run: |
+          set -euo pipefail
+          # native XDP 跟驱动不跟型号: stmmac/dwmac-rk 系 GMAC 口才有 ndo_bpf;
+          # Realtek (r8125/r8169) 与 USB 口只能 generic —— 按策略不烘 XDP 器具。
+          # 白名单扩展: 新硬件先核内核符号 stmmac_xdp_set_prog/__stmmac_xdp_run_prog/
+          # stmmac_xdp_xmit 齐全再入列 (openwrt-firmware 技能 references/xdp-native-fleet.md)。
+          case "${{ inputs.profile }}" in
+            friendlyarm_nanopi-r3s|friendlyarm_nanopi-r4s|friendlyarm_nanopi-r4se|friendlyarm_nanopi-r4s-enterprise|friendlyarm_nanopi-r5s)
+              echo "ENABLE_XDP=yes" >> "$GITHUB_ENV"
+              echo "XDP: enabled — native-capable (${{ inputs.profile }})"
+              ;;
+            *)
+              echo "ENABLE_XDP=no" >> "$GITHUB_ENV"
+              echo "XDP: disabled — 纯内核网络栈 (非白名单硬件)"
+              ;;
+          esac
+
       - name: Stage files/ (管理IP + dae + geo + Tailscale)
         run: |
           set -euo pipefail
-          mkdir -p files/etc/config files/usr/bin files/usr/sbin files/usr/local/share/dae files/etc/init.d files/etc/uci-defaults files/root/xdp
+          mkdir -p files/etc/config files/usr/bin files/usr/sbin files/usr/local/share/dae files/etc/init.d files/etc/uci-defaults
           # 管理 IP (供首启脚本读取)
           echo "${{ inputs.custom_router_ip }}" > files/etc/config/custom_router_ip.txt
           # dae main@e3fee8fb (2026-10-02 Daily Build; 本仓库 Releases 托管; 换版: 改 URL + sha 两行)
@@ -150,12 +169,21 @@ jobs:
           install -m 0755 /tmp/tailscale_1.102.4_arm64/tailscaled files/usr/sbin/tailscaled
           # 执行位 (仓库已带 755; 此处兜底)
           chmod 0755 files/etc/init.d/dae files/etc/uci-defaults/99-custom.sh
+          # XDP 叠加 (门控): 仅 native 硬件把试装件叠进 files/; 其余不叠加
+          if [ "${ENABLE_XDP:-no}" = "yes" ]; then
+            mkdir -p files/root/xdp
+            cp xdp/xdp_pass.c xdp/README-xdp.txt files/root/xdp/
+          fi
           echo "== files/ 清单 =="
           find files -type f | sort
 
-      - name: Compile XDP 试装件 (clang -target bpf)
+      - name: Compile XDP 试装件 (clang -target bpf; 仅白名单硬件)
         run: |
           set -euo pipefail
+          if [ "${ENABLE_XDP:-no}" != "yes" ]; then
+            echo "XDP disabled — skip compile (纯内核网络栈)"
+            exit 0
+          fi
           if ! command -v clang >/dev/null 2>&1; then
             sudo apt-get -qq update && sudo apt-get -qq install -y clang
           fi
@@ -180,17 +208,23 @@ jobs:
               -e PROFILE="${{ inputs.profile }}" \
               -e ROOTFS_PARTSIZE="$ROOTFS_SIZE" \
               -e ENABLE_DOCKER="${{ inputs.enable_docker }}" \
+              -e ENABLE_XDP="$ENABLE_XDP" \
           immortalwrt/imagebuilder:rockchip-armv8-openwrt-${{ inputs.luci_version }} /bin/bash /home/build/immortalwrt/build.sh
           echo "== 产物 =="
           ls -la bin/targets/rockchip/armv8/
 
-      - name: Self-check (manifest + 解包比对 + XDP)
+      - name: Self-check (manifest + 解包比对 + XDP 门控)
         env:
           ENABLE_DOCKER: ${{ inputs.enable_docker }}
         run: bash scripts/selfcheck.sh
 
       - name: Create info
         run: |
+          if [ "${ENABLE_XDP:-no}" = "yes" ]; then
+            XDP_LINE="- 🧪 **XDP**: 工具面 + /root/xdp 试装件在机 (native 口; 用法见机内 /root/xdp/README-xdp.txt)"
+          else
+            XDP_LINE="- 🧱 **XDP**: 未启用 — 纯内核网络栈 (非 native 硬件, 按策略不烘)"
+          fi
           cat > "${{ github.workspace }}/router-info.md" <<EOF
           ## 📡 路由器后台信息
 
@@ -199,7 +233,7 @@ jobs:
           - 👤 **用户名**: root
           - 🔑 **密码**: 无 (刷机后请尽快设置)
           - 🧬 **dae**: main@e3fee8fb (10/02 Daily) 已烘入 (/usr/bin/dae + /etc/init.d/dae + geo; 刷后放 /etc/dae/config.dae (0640) 再 start)
-          - 🧪 **XDP**: 全量工具面 + /root/xdp/ 试装件 (native/skb 两种挂法; 用法见机内 /root/xdp/README-xdp.txt)
+          $XDP_LINE
           - 🐳 **Docker**: ${{ inputs.enable_docker }}
           - 🧦 **Tailscale**: 官方静态 v1.102.4 (/usr/sbin)
           - 🎨 **主题**: bootstrap (无 argon)
