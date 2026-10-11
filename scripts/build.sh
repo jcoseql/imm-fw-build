@@ -42,10 +42,22 @@ echo "--- repositories (官方 feed) ---"
 cat repositories
 echo "================================================"
 
+# 仅产 squashfs 版 (2026-10-11 定稿): 关闭 ext4 镜像目标, 省一半产物空间
+sed -i 's/^CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
+grep -n "EXT4FS" .config || echo "(未找到 EXT4FS 行, 以下方兜底删除为准)"
+
 make image \
   PROFILE="$PROFILE" \
   PACKAGES="$PACKAGES" \
   FILES="/home/build/immortalwrt/files" \
   ROOTFS_PARTSIZE="$ROOTFS_PARTSIZE"
+
+# 收尾: 兜底去 ext4 (防 .config 行格式变动) + sha256sums 只覆盖将发布的文件
+cd bin/targets/rockchip/armv8
+rm -f *ext4*
+sha256sum *.img.gz *.manifest > sha256sums
+echo "== 产物 (squashfs-only) =="
+ls -la
+cd /home/build/immortalwrt
 
 echo "BUILD_OK"

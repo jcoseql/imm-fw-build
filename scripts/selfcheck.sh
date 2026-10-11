@@ -10,6 +10,9 @@ cd bin/targets/rockchip/armv8
 IMG=$(ls *squashfs-sysupgrade.img.gz | head -1)
 [ -n "$IMG" ] || { echo "❌ 未找到 squashfs-sysupgrade 镜像"; ls -la; exit 1; }
 MAN=$(ls *.manifest | head -1)
+# squashfs-only 定稿 (2026-10-11): 不应再出现 ext4 产物
+if ls *ext4* >/dev/null 2>&1; then echo "❌ ext4 产物残留 (应为 squashfs-only):"; ls -la *ext4*; exit 1; fi
+echo "✓ 无 ext4 产物 (squashfs-only)"
 echo "IMG = $IMG"
 echo "MAN = $MAN"
 echo "ENABLE_XDP = ${ENABLE_XDP:-no}"
