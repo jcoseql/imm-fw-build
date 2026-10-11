@@ -17,6 +17,8 @@ PACKAGES="$PACKAGES luci-app-vlmcsd luci-i18n-vlmcsd-zh-cn vlmcsd"
 PACKAGES="$PACKAGES kmod-sched-core kmod-sched-bpf kmod-veth kmod-tun kmod-xdp-sockets-diag"
 PACKAGES="$PACKAGES tailscale"
 # 注: tailscale 包提供 init/配置/uci 集成; 实际二进制由 files/usr/sbin/ 覆盖为官方静态 v1.102.4
+# 系统监控: imm 基础连 htop 都没有; 烘入 btop (官方 feed, libstdcpp 等依赖自动解析)
+PACKAGES="$PACKAGES btop"
 # XDP 工具面 —— 门控: 仅 native-capable 硬件 (workflow 白名单判定, ENABLE_XDP=yes) 才烘入;
 # 默认 no = 纯内核网络栈 (Realtek 口无 native XDP; 试装件在 xdp/, 由 workflow 条件叠加)
 if [ "${ENABLE_XDP:-no}" = "yes" ]; then

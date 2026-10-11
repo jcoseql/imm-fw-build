@@ -17,10 +17,10 @@ echo "ENABLE_XDP = ${ENABLE_XDP:-no}"
 echo "== [1] manifest 断言 =="
 if grep -qi "argon" "$MAN"; then echo "❌ manifest 残留 argon:"; grep -i argon "$MAN"; exit 1; fi
 echo "✓ 无 argon"
-for p in vlmcsd luci-app-upnp miniupnpd-nftables luci-app-vlmcsd luci-i18n-ttyd-zh-cn openssh-sftp-server tailscale; do
+for p in vlmcsd luci-app-upnp miniupnpd-nftables luci-app-vlmcsd luci-i18n-ttyd-zh-cn openssh-sftp-server tailscale btop; do
   grep -q "^${p} " "$MAN" || { echo "❌ 缺包: $p"; exit 1; }
 done
-echo "✓ 关键包在列 (vlmcsd / upnp / ttyd-zh / sftp-server / tailscale)"
+echo "✓ 关键包在列 (vlmcsd / upnp / ttyd-zh / sftp-server / tailscale / btop)"
 if [ "${ENABLE_XDP:-no}" = "yes" ]; then
   for p in ip-full bpftool-minimal xdp-loader xdp-filter xdpdump; do
     grep -q "^${p} " "$MAN" || { echo "❌ 缺包 (native 硬件应带 XDP 工具面): $p"; exit 1; }
