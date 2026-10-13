@@ -17,7 +17,7 @@ PACKAGES="$PACKAGES luci-app-vlmcsd luci-i18n-vlmcsd-zh-cn vlmcsd"
 PACKAGES="$PACKAGES kmod-sched-core kmod-sched-bpf kmod-veth kmod-tun kmod-xdp-sockets-diag"
 PACKAGES="$PACKAGES tailscale"
 # 注: tailscale 包提供 init/配置/uci 集成; 实际二进制由 files/usr/sbin/ 覆盖为官方静态 v1.102.4
-# 系统监控: imm 基础连 htop 都没有; 烘入 btop (官方 feed, libstdcpp 等依赖自动解析)
+# 系统监控: btop 全构建常驻 (2026-10-11 定; imm 基础无 htop/btop; libstdcpp 等依赖自动解析)
 PACKAGES="$PACKAGES btop"
 # 网络诊断: ethtool 全构建常驻 (2026-10-13 定; 网卡/链路/IRQ 合并参数诊断)
 PACKAGES="$PACKAGES ethtool"

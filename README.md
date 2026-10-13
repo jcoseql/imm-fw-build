@@ -14,6 +14,7 @@
 | XDP 工具面（门控） | 官方 feed：`ip-full` `bpftool-minimal` `xdp-loader` `xdp-filter` `xdpdump` —— 仅 native-capable 硬件白名单烘入 | 自检条件断言；非白名单断言零残留 |
 | XDP 试装件 + 开机固化（门控） | `xdp/`（xdp_pass.c + rc.local + README；CI 条件叠加进 `files/`，rc.local → `/etc/rc.local`） | native 硬件才现编 .o（clang -target bpf）；自检断言 ELF + rc.local 固化块 / 断言无残留 |
 | 首启脚本 | `files/etc/uci-defaults/99-custom.sh`（自建，仅设管理 IP） | 自检断言在位 |
+| btop | 官方 feed | **全构建常驻**（2026-10-11 起；交互式资源监控；补 imm 基础无 htop/btop）；selfcheck 断言在列 |
 | ethtool | 官方 feed | **全构建常驻**（2026-10-13 起；网络/IRQ 诊断）；selfcheck 断言在列 |
 | 包清单 | `scripts/build.sh`（唯一权威位置） | 自检断言关键包（docker/XDP 条件断言） |
 
