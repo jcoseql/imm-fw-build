@@ -34,7 +34,7 @@ XDP 器具只烘给 **native-capable 硬件**（stmmac/dwmac-rk 系 GMAC 口；�
 
 ## 刷机后
 
-- 网络/PPPoE/dae 配置/TS state 等敏感配置**刻意不进镜像**；按恢复套件（`r3s_home_build/kit/README_restore.md`）scp 恢复
+- 网络/PPPoE/dae 配置/TS state 等敏感配置**刻意不进镜像**；按恢复套件（`~/Downloads/deploy/r3s_imm_kit/kit/README_restore.md`）scp 恢复
 - dae：放 `/etc/dae/config.dae`（0640）→ `/etc/init.d/dae start`（S99dae 已就位）
 - Tailscale：恢复 `/etc/tailscale/` state → `/etc/init.d/tailscale start`
 - Docker：`/etc/init.d/dockerd enable` 开自启（镜像不自动 enable）；data-root 默认 `/opt/docker`，建议先挂盘再改 `/etc/config/dockerd`
