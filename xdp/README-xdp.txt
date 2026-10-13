@@ -33,4 +33,5 @@ XDP 试装件 —— /root/xdp/
 注意:
   * 两种模式丢弃的包对本机 conntrack/tcpdump 都不可见；native 更早（无 skb 开销）
   * XDP 位于 tc/iptables 之前；与 dae（tc eBPF 透明代理）可共存（R3S 已实测）
-  * 重启后挂载不保留（属预期，重新挂即可）
+  * 开机自动挂（2026-10-13 起）: 本固件 /etc/rc.local 已内置固化块——等 WAN 就绪（PPPoE: pppoe-wan；DHCP: eth0）再稳 5s，自动挂 eth0 native。撤 = 删 /etc/rc.local 中的块；手动重挂/卸载照常。
+  * 为何等 WAN 才挂: attach 撞链路收敛窗口会致数据面半死（PPPoE PADO timeout）——2026-10-13 在 R3S 实锤修复（细节见 rc.local 块注释）。

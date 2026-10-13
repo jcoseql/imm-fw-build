@@ -12,7 +12,7 @@
 | dae procd init | `files/etc/init.d/dae` | sha256 `824fc2e3…`；IB 自动 enable（S99dae） |
 | Tailscale 官方静态 `v1.102.4` | `pkgs.tailscale.com`（GitHub Release 无二进制资产） | sha256 ×3（tgz + 两二进制）；自检解包比对 |
 | XDP 工具面（门控） | 官方 feed：`ip-full` `bpftool-minimal` `xdp-loader` `xdp-filter` `xdpdump` —— 仅 native-capable 硬件白名单烘入 | 自检条件断言；非白名单断言零残留 |
-| XDP 试装件（门控） | `xdp/`（xdp_pass.c + README；CI 条件叠加进 `files/`） | native 硬件才现编 .o（clang -target bpf）；自检断言 ELF / 断言无残留 |
+| XDP 试装件 + 开机固化（门控） | `xdp/`（xdp_pass.c + rc.local + README；CI 条件叠加进 `files/`，rc.local → `/etc/rc.local`） | native 硬件才现编 .o（clang -target bpf）；自检断言 ELF + rc.local 固化块 / 断言无残留 |
 | 首启脚本 | `files/etc/uci-defaults/99-custom.sh`（自建，仅设管理 IP） | 自检断言在位 |
 | ethtool | 官方 feed | **全构建常驻**（2026-10-13 起；网络/IRQ 诊断）；selfcheck 断言在列 |
 | 包清单 | `scripts/build.sh`（唯一权威位置） | 自检断言关键包（docker/XDP 条件断言） |
@@ -20,6 +20,8 @@
 ### XDP 门控（2026-10-10 起）
 
 XDP 器具只烘给 **native-capable 硬件**（stmmac/dwmac-rk 系 GMAC 口；白名单在 workflow「XDP 门控」步骤，判定依据 `openwrt-firmware` 技能 references/xdp-native-fleet.md）。Realtek（r8125/r8169）与 USB 口只能 generic——此类机型（如 E52C/R2）固件为**纯内核网络栈**，自检断言无 XDP 残留。
+
+门控件三件套（2026-10-13 起）：**工具面**（feed 包）+ **试装件**（`/root/xdp/`）+ **开机固化块**（`xdp/rc.local` → `/etc/rc.local`：等 WAN 就绪 +5s 拉起 eth0 native；时机修复 2026-10-13 R3S 实锤，细节见块注释）。
 
 ## 运行
 
@@ -39,7 +41,7 @@ XDP 器具只烘给 **native-capable 硬件**（stmmac/dwmac-rk 系 GMAC 口；�
 - dae：放 `/etc/dae/config.dae`（0640）→ `/etc/init.d/dae start`（S99dae 已就位）
 - Tailscale：恢复 `/etc/tailscale/` state → `/etc/init.d/tailscale start`
 - Docker：`/etc/init.d/dockerd enable` 开自启（镜像不自动 enable）；data-root 默认 `/opt/docker`，建议先挂盘再改 `/etc/config/dockerd`
-- XDP（仅 native 白名单硬件有）：`/root/xdp/README-xdp.txt` 有用法说明（native/skb 两种挂法）；非白名单硬件（如 E52C）无此器具，纯内核网络栈
+- XDP（仅 native 白名单硬件有）：**开机自动挂已内置**（`/etc/rc.local` 固化块：等 WAN 就绪 +5s 拉起 eth0 native）；`/root/xdp/README-xdp.txt` 有用法说明（挂法/撤法）；非白名单硬件（如 E52C）无此器具，纯内核网络栈
 - root 无密码：尽快设置；WAN 入站默认拒绝（首启脚本不做任何放开）
 
 ## 版本升级
@@ -47,6 +49,7 @@ XDP 器具只烘给 **native-capable 硬件**（stmmac/dwmac-rk 系 GMAC 口；�
 - **dae 换版**：传新二进制到 Releases → 改 workflow 里 URL + sha（2 行）+ `selfcheck.sh` 里对应 sha（1 行）
 - **Tailscale 换版**：改 workflow 里 URL（1 处）+ sha（3 处）+ `selfcheck.sh`（2 行）
 - **增删包**：只改 `scripts/build.sh` 的 PACKAGES（docker 块在那里；XDP 工具面在其门控分支内，白名单在 workflow）
+- **XDP 固化块**：改 `xdp/rc.local`（门控机型固件自动叠加为 /etc/rc.local；自检断言其含固化块）
 
 ## 本地复核（可选）
 

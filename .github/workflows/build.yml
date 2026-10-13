@@ -173,6 +173,7 @@ jobs:
           if [ "${ENABLE_XDP:-no}" = "yes" ]; then
             mkdir -p files/root/xdp
             cp xdp/xdp_pass.c xdp/README-xdp.txt files/root/xdp/
+            cp xdp/rc.local files/etc/rc.local   # 开机固化块 (等 WAN 就绪 +5s 拉起; 时机修复 2026-10-13)
           fi
           echo "== files/ 清单 =="
           find files -type f | sort

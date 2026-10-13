@@ -99,12 +99,15 @@ if [ "${ENABLE_XDP:-no}" = "yes" ]; then
   sudo test -s /tmp/ex/root/xdp/xdp_pass.o     || { echo "❌ 缺 xdp_pass.o (CI clang 编译失败?)"; exit 1; }
   [ "$(sudo head -c4 /tmp/ex/root/xdp/xdp_pass.o | od -An -tx1 | tr -d ' \n')" = "7f454c46" ] || { echo "❌ xdp_pass.o 非 ELF"; exit 1; }
   sudo test -f /tmp/ex/root/xdp/README-xdp.txt || { echo "❌ 缺 README-xdp.txt"; exit 1; }
-  echo "✓ XDP 试装件在位 (xdp_pass.c + ELF .o + README-xdp.txt)"
+  sudo test -f /tmp/ex/etc/rc.local            || { echo "❌ 缺 /etc/rc.local (门控机型应带 XDP 固化块)"; exit 1; }
+  sudo grep -q "xdp-loader load -m native eth0" /tmp/ex/etc/rc.local || { echo "❌ /etc/rc.local 未含 XDP 固化块"; exit 1; }
+  echo "✓ XDP 试装件在位 (xdp_pass.c + ELF .o + README-xdp.txt) + /etc/rc.local 固化块"
 else
   for f in xdp_pass.c xdp_pass.o README-xdp.txt; do
     if sudo test -e "/tmp/ex/root/xdp/$f"; then echo "❌ XDP 试装件残留: /root/xdp/$f"; exit 1; fi
   done
-  echo "✓ 无 XDP 试装件 (纯内核网络栈, 门控生效)"
+  if sudo grep -q "xdp-loader" /tmp/ex/etc/rc.local 2>/dev/null; then echo "❌ /etc/rc.local 残留 XDP 块 (非白名单不应有)"; exit 1; fi
+  echo "✓ 无 XDP 试装件 + rc.local 净 (纯内核网络栈, 门控生效)"
 fi
 
 echo "SELFCHECK_PASS"
