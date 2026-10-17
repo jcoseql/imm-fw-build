@@ -88,7 +88,9 @@ if [ "${ENABLE_GOST:-no}" = "yes" ]; then
   check_sha eab7a864df3c5b68117c2e61cf40034638e76f99c862077043131e3ab71fecdf /tmp/ex/usr/bin/gost
   sudo test -x /tmp/ex/etc/init.d/gost || { echo "❌ 缺 /etc/init.d/gost"; exit 1; }
   sudo test -f /tmp/ex/etc/config/gost || { echo "❌ 缺 /etc/config/gost"; exit 1; }
-  sudo grep -q "gost.main.enabled" /tmp/ex/etc/config/gost || { echo "❌ gost uci 配置不含 enabled"; exit 1; }
+  sudo grep -q "^config gost" /tmp/ex/etc/config/gost || { echo "❌ gost uci 配置节缺失"; exit 1; }
+  sudo grep -q "option enabled" /tmp/ex/etc/config/gost || { echo "❌ gost uci 缺 enabled 项"; exit 1; }
+  sudo grep -q "option password" /tmp/ex/etc/config/gost || { echo "❌ gost uci 缺 password 项"; exit 1; }
   sudo ls /tmp/ex/etc/rc.d/ | grep -qiE "^S[0-9]+gost$" || { echo "❌ rc.d 缺 S*gost (IB 未自动 enable)"; exit 1; }
   echo "✓ gost 烘入完整 (binary sha / init 755 / uci / S*gost 自启)"
 else
