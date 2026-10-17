@@ -8,6 +8,7 @@ name: Build 25.12.x Rockchip (自建 IB · dae 固化版)
 #   门控: XDP 工具面 + /root/xdp 试装件 —— 仅 native-capable 硬件 (白名单) 自动烘入;
 #         其余硬件 (E52C/R2 等 Realtek 口) 保持纯内核网络栈, 自检断言无 XDP 残留
 #   可选: enable_docker=yes → docker/dockerd/compose + kmod-br-netfilter (依赖自动解析)
+#   可选: enable_gost=yes   → gost 2.12.0 静态 arm64 + procd init + uci (默认不装, 仅出口节点按需)
 #   首启: files/etc/uci-defaults/99-custom.sh —— 仅设管理 IP, 不放开 WAN 入站
 #   自检: manifest 断言 + 解包比对烘入件 sha256 + XDP 门控双断言 (scripts/selfcheck.sh)
 #   仅手动触发 (workflow_dispatch)
@@ -117,6 +118,14 @@ on:
         options:
           - "no"
           - "yes"
+      enable_gost:
+        description: "集成 gost (socks5 出口; 默认不装, 仅出口节点按需)"
+        required: true
+        type: choice
+        default: "no"
+        options:
+          - "no"
+          - "yes"
 
 permissions:
   contents: write
@@ -169,6 +178,16 @@ jobs:
           install -m 0755 /tmp/tailscale_1.102.4_arm64/tailscaled files/usr/sbin/tailscaled
           # 执行位 (仓库已带 755; 此处兜底)
           chmod 0755 files/etc/init.d/dae files/etc/uci-defaults/99-custom.sh
+          # gost 叠加 (按需开关): 官方 2.12.0 静态 arm64, 本仓库 Releases 托管, sha256 锁定
+          #   非出口节点一律不装 (enable_gost=no 时不落任何 gost 文件)
+          if [ "${{ inputs.enable_gost }}" = "yes" ]; then
+            curl -fsSL -o /tmp/gost https://github.com/jcoseql/imm-fw-build/releases/download/gost-bin-2.12.0/gost-linux-arm64-2.12.0
+            echo "eab7a864df3c5b68117c2e61cf40034638e76f99c862077043131e3ab71fecdf  /tmp/gost" | sha256sum -c
+            install -m 0755 /tmp/gost files/usr/bin/gost
+            install -m 0755 gost/gost.init files/etc/init.d/gost
+            install -m 0644 gost/gost.config files/etc/config/gost
+            echo "gost: staged (enabled=0 默认, 刷后注入账密再启)"
+          fi
           # XDP 叠加 (门控): 仅 native 硬件把试装件叠进 files/; 其余不叠加
           if [ "${ENABLE_XDP:-no}" = "yes" ]; then
             mkdir -p files/root/xdp
@@ -214,9 +233,10 @@ jobs:
           echo "== 产物 =="
           ls -la bin/targets/rockchip/armv8/
 
-      - name: Self-check (manifest + 解包比对 + XDP 门控)
+      - name: Self-check (manifest + 解包比对 + XDP/gost 门控)
         env:
           ENABLE_DOCKER: ${{ inputs.enable_docker }}
+          ENABLE_GOST: ${{ inputs.enable_gost }}
         run: bash scripts/selfcheck.sh
 
       - name: Create info
@@ -225,6 +245,11 @@ jobs:
             XDP_LINE="- 🧪 **XDP**: 工具面 + /root/xdp 试装件在机 (native 口; 用法见机内 /root/xdp/README-xdp.txt)"
           else
             XDP_LINE="- 🧱 **XDP**: 未启用 — 纯内核网络栈 (非 native 硬件, 按策略不烘)"
+          fi
+          if [ "${{ inputs.enable_gost }}" = "yes" ]; then
+            GOST_LINE="- 🧦 **gost**: 2.12.0 静态 arm64 已烘入 (/usr/bin/gost + /etc/init.d/gost + /etc/config/gost, 默认 enabled=0; 刷后注入账密再启)"
+          else
+            GOST_LINE="- 🚫 **gost**: 未装"
           fi
           cat > "${{ github.workspace }}/router-info.md" <<EOF
           ## 📡 路由器后台信息
@@ -236,6 +261,7 @@ jobs:
           - 🧬 **dae**: main@e3fee8fb (10/02 Daily) 已烘入 (/usr/bin/dae + /etc/init.d/dae + geo; 刷后放 /etc/dae/config.dae (0640) 再 start)
           $XDP_LINE
           - 🐳 **Docker**: ${{ inputs.enable_docker }}
+          $GOST_LINE
           - 🧦 **Tailscale**: 官方静态 v1.102.4 (/usr/sbin)
           - 🎨 **主题**: bootstrap (无 argon)
           - 🛡️ **首启**: 仅设管理 IP; WAN 入站默认拒绝

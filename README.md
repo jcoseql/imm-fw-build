@@ -16,6 +16,7 @@
 | 首启脚本 | `files/etc/uci-defaults/99-custom.sh`（自建，仅设管理 IP） | 自检断言在位 |
 | btop | 官方 feed | **全构建常驻**（2026-10-11 起；交互式资源监控；补 imm 基础无 htop/btop）；selfcheck 断言在列 |
 | ethtool | 官方 feed | **全构建常驻**（2026-10-13 起；网络/IRQ 诊断）；selfcheck 断言在列 |
+| gost 2.12.0（按需） | 本仓库 Releases `gost-bin-2.12.0`（官方静态 arm64） | `enable_gost=yes` 才烘入（出口节点专用，**非常驻**）；sha256 `eab7a864…` 锁定；含 `/etc/init.d/gost` + `/etc/config/gost`（默认 enabled=0，账密刷后注入）；自检条件断言 / 关闭时断言零残留 |
 | 包清单 | `scripts/build.sh`（唯一权威位置） | 自检断言关键包（docker/XDP 条件断言） |
 
 ### XDP 门控（2026-10-10 起）
@@ -31,8 +32,9 @@ XDP 器具只烘给 **native-capable 硬件**（stmmac/dwmac-rk 系 GMAC 口；�
    - `luci_version`：25.12.2（= builder 镜像 tag）
    - `profile`：设备型号（如 `friendlyarm_nanopi-r3s` / `radxa_e52c`）
    - `custom_router_ip`：管理地址（如 `192.168.12.1`）
-   - `rootfs_partsize`：2G 默认（R3S 用 4G）
+   - `rootfs_partsize`：**无 docker 一律 2G**（2026-10-17 定；Docker 才上 4G）
    - `enable_docker`：默认 no；yes 时加 docker/dockerd/compose + kmod-br-netfilter（其余依赖自动解析）
+   - `enable_gost`：默认 no；**仅出口节点按需**开 yes（gost 2.12.0 + procd init + uci，默认 enabled=0，刷后注入账密再启）
 3. 构建结束前自带 **Self-check**（manifest 断言 + 解包 sha 比对 + XDP 门控双断言），失败会红
 4. 产物在 Releases（tag `Autobuild`）：`*.img.gz` + `sha256sums` + `*.manifest`
 

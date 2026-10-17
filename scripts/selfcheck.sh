@@ -4,6 +4,7 @@
 #   1) manifest 断言: 无 argon; 关键包在列 (docker/XDP 按开关条件断言; 非 XDP 断言零残留)
 #   2) 解包 squashfs: 比对烘入件 sha256; 检查首启脚本 / rc.d / 无 config.dae
 #   3) XDP 门控: 白名单硬件断言试装件在位 (ELF .o); 非白名单断言零残留
+#   4) gost 门控: enable_gost=yes 断言 binary/init/uci/自启; no 断言零残留
 # ============================================================
 set -euo pipefail
 cd bin/targets/rockchip/armv8
@@ -81,6 +82,20 @@ check_sha 93c3558f592200133b377dd9f96eac9b278b9057f7ae6b8656b15f4fa05506d0 /tmp/
 check_sha 1ff5174fcbf3abbff85eacc73e6e548b0d094d913a48c1369f60811d1e92eeef /tmp/ex/usr/sbin/tailscaled
 check_sha 824fc2e32cef8f14e8f669e7d53ede18870aeeb14983307bb53b3b9dbf4d19b4 /tmp/ex/etc/init.d/dae
 echo "✓ 烘入件 sha 全部一致 (dae e3fee8fb / tailscale / tailscaled / dae-init)"
+
+echo "== [2b] gost 门控 =="
+if [ "${ENABLE_GOST:-no}" = "yes" ]; then
+  check_sha eab7a864df3c5b68117c2e61cf40034638e76f99c862077043131e3ab71fecdf /tmp/ex/usr/bin/gost
+  sudo test -x /tmp/ex/etc/init.d/gost || { echo "❌ 缺 /etc/init.d/gost"; exit 1; }
+  sudo test -f /tmp/ex/etc/config/gost || { echo "❌ 缺 /etc/config/gost"; exit 1; }
+  sudo grep -q "gost.main.enabled" /tmp/ex/etc/config/gost || { echo "❌ gost uci 配置不含 enabled"; exit 1; }
+  sudo ls /tmp/ex/etc/rc.d/ | grep -qiE "^S[0-9]+gost$" || { echo "❌ rc.d 缺 S*gost (IB 未自动 enable)"; exit 1; }
+  echo "✓ gost 烘入完整 (binary sha / init 755 / uci / S*gost 自启)"
+else
+  if sudo test -e /tmp/ex/usr/bin/gost; then echo "❌ gost 残留 (enable_gost=no 不应烘入)"; exit 1; fi
+  if sudo test -e /tmp/ex/etc/config/gost; then echo "❌ gost uci 残留 (enable_gost=no)"; exit 1; fi
+  echo "✓ 无 gost (按需开关关闭)"
+fi
 
 test -x /tmp/ex/etc/uci-defaults/99-custom.sh || { echo "❌ 首启脚本缺失或不可执行"; exit 1; }
 grep -q "custom_router_ip" /tmp/ex/etc/uci-defaults/99-custom.sh
